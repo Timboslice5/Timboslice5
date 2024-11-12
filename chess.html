@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timothy's Chess Game</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: Arial, sans-serif;
+    }
+    #chess-board {
+      display: grid;
+      grid-template-columns: repeat(8, 60px);
+      grid-template-rows: repeat(8, 60px);
+      gap: 1px;
+      border: 2px solid black;
+    }
+    .square {
+      width: 60px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2em;
+    }
+    .white { background-color: #f0d9b5; }
+    .black { background-color: #b58863; }
+    .selected { outline: 3px solid yellow; }
+    button {
+      margin: 10px;
+      padding: 10px;
+      font-size: 1em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Timothy's Chess Game</h1>
+  <div id="chess-board"></div>
+  <div>
+    <button onclick="resign('White')">White Resigns</button>
+    <button onclick="resign('Black')">Black Resigns</button>
+  </div>
+  <h2 id="status">White's turn</h2>
+
+  <script>
+    const board = [
+      ["♜", "♞", "♝", "♛", "♚", "♝", "♞", "♜"],
+      ["♟", "♟", "♟", "♟", "♟", "♟", "♟", "♟"],
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["♙", "♙", "♙", "♙", "♙", "♙", "♙", "♙"],
+      ["♖", "♘", "♗", "♕", "♔", "♗", "♘", "♖"],
+    ];
+
+    const boardElement = document.getElementById("chess-board");
+    const statusElement = document.getElementById("status");
+    let selectedPiece = null;
+    let selectedPosition = null;
+    let isWhiteTurn = true;
+
+    function createBoard() {
+      boardElement.innerHTML = ""; // Clear the board
+      board.forEach((row, rowIndex) => {
+        row.forEach((piece, colIndex) => {
+          const square = document.createElement("div");
+          square.className = "square " + ((rowIndex + colIndex) % 2 === 0 ? "white" : "black");
+          square.dataset.row = rowIndex;
+          square.dataset.col = colIndex;
+          square.textContent = piece; // Display the piece on the square
+          square.addEventListener("click", onSquareClick);
+          boardElement.appendChild(square);
+        });
+      });
+    }
+
+    function onSquareClick(event) {
+      const row = parseInt(event.currentTarget.dataset.row);
+      const col = parseInt(event.currentTarget.dataset.col);
+      const piece = board[row][col];
+
+      if (selectedPosition && selectedPosition.row === row && selectedPosition.col === col) {
+        clearSelection();
+        return;
+      }
+
+      if (selectedPiece) {
+        movePiece(row, col);
+      } else if (piece) {
+        selectPiece(row, col);
+      }
+    }
+
+    function selectPiece(row, col) {
+      const piece = board[row][col];
+      const isWhitePiece = piece && piece === piece.toUpperCase(); // White pieces assumed to be uppercase
+      const isBlackPiece = piece && piece === piece.toLowerCase(); // Black pieces assumed to be lowercase
+
+      if ((isWhiteTurn && isWhitePiece) || (!isWhiteTurn && isBlackPiece)) {
+        selectedPiece = piece;
+        selectedPosition = { row, col };
+        document.querySelectorAll(".square").forEach((square) => square.classList.remove("selected"));
+        const square = boardElement.children[row * 8 + col];
+        square.classList.add("selected");
+      } else {
+        alert("It's not your turn!");
+      }
+    }
+
+    function movePiece(row, col) {
+      if (isValidMove(selectedPosition.row, selectedPosition.col, row, col)) {
+        board[selectedPosition.row][selectedPosition.col] = "";
+        board[row][col] = selectedPiece;
+        clearSelection();
+        isWhiteTurn = !isWhiteTurn; // Switch turn
+        createBoard(); // Refresh the board display
+        updateStatus();
+      } else {
+        alert("Invalid move for this piece!");
+      }
+    }
+
+    function clearSelection() {
+      selectedPiece = null;
+      selectedPosition = null;
+      document.querySelectorAll(".square").forEach((square) => square.classList.remove("selected"));
+    }
+
+    function updateStatus() {
+      statusElement.textContent = isWhiteTurn ? "White's turn" : "Black's turn";
+    }
+
+    function isValidMove(startRow, startCol, endRow, endCol) {
+      const piece = board[startRow][startCol];
+      const targetPiece = board[endRow][endCol];
+      const isOpponent = targetPiece && (isWhiteTurn ? targetPiece === targetPiece.toLowerCase() : targetPiece === targetPiece.toUpperCase());
+
+      if (piece) {
+        switch (piece.toLowerCase()) {
+          case '♙': // Pawn
+          case '♟':
+            return isValidPawnMove(startRow, startCol, endRow, endCol, isOpponent, piece);
+          case '♘': // Knight (White) or '♞' (Black)
+          case '♞':
+            return isValidKnightMove(startRow, startCol, endRow, endCol);
+          case '♖': // Rook (White) or '♜' (Black)
+          case '♜':
+            return isValidRookMove(startRow, startCol, endRow, endCol);
+          case '♗': // Bishop (White) or '♝' (Black)
+          case '♝':
+            return isValidBishopMove(startRow, startCol, endRow, endCol);
+          case '♕': // Queen (White) or '♛' (Black)
+          case '♛':
+            return isValidQueenMove(startRow, startCol, endRow, endCol);
+          case '♔': // King (White) or '♚' (Black)
+          case '♚':
+            return isValidKingMove(startRow, startCol, endRow, endCol);
+          default:
+            return false;
+        }
+      }
+      return false;
+    }
+
+    // Pawn movement logic
+    function isValidPawnMove(startRow, startCol, endRow, endCol, isOpponent, piece) {
+      const direction = piece === '♙' ? -1 : 1; // White moves up (-1), black moves down (+1)
+      if (startCol === endCol && board[endRow][endCol] === "") {
+        if (endRow === startRow + direction) return true; // One square move
+        if ((piece === '♙' && startRow === 6 || piece === '♟' && startRow === 1) && endRow === startRow + 2 * direction && board[startRow + direction][startCol] === "") return true; // Two square move
+      }
+      if (Math.abs(startCol - endCol) === 1 && endRow === startRow + direction && isOpponent) return true; // Capture diagonally
+      return false;
+    }
+
+    // Knight movement logic
+    function isValidKnightMove(startRow, startCol, endRow, endCol) {
+      const rowDiff = Math.abs(startRow - endRow);
+      const colDiff = Math.abs(startCol - endCol);
+      return (rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2); // "L" shape movement
+    }
+
+    // Rook movement logic using row and column differences
+    function isValidRookMove(startRow, startCol, endRow, endCol) {
+      if (startRow === endRow) { // Horizontal move
+        const step = (endCol > startCol) ? 1 : -1;
+        for (let col = startCol + step; col !== endCol; col += step) {
+          if (board[startRow][col] !== "") return false; // Path blocked
+        }
+        return true;
+      }
+      if (startCol === endCol) { // Vertical move
+        const step = (endRow > startRow) ? 1 : -1;
+        for (let row = startRow + step; row !== endRow; row += step) {
+          if (board[row][startCol] !== "") return false; // Path blocked
+        }
+        return true;
+      }
+      return false;
+    }
+
+    // Bishop movement logic using row and column differences
+    function isValidBishopMove(startRow, startCol, endRow, endCol) {
+      const rowDiff = Math.abs(startRow - endRow);
+      const colDiff = Math.abs(startCol - endCol);
+      if (rowDiff === colDiff) { // Diagonal move
+        const rowStep = (endRow > startRow) ? 1 : -1;
+        const colStep = (endCol > startCol) ? 1 : -1;
+        for (let i = 1; i < rowDiff; i++) {
+          if (board[startRow + i * rowStep][startCol + i * colStep] !== "") return false; // Path blocked
+        }
+        return true;
+      }
+      return false;
+    }
+
+    // Queen movement logic (combines rook and bishop)
+    function isValidQueenMove(startRow, startCol, endRow, endCol) {
+      return isValidRookMove(startRow, startCol, endRow, endCol) || isValidBishopMove(startRow, startCol, endRow, endCol);
+    }
+
+    // King movement logic
+    function isValidKingMove(startRow, startCol, endRow, endCol) {
+      const rowDiff = Math.abs(startRow - endRow);
+      const colDiff = Math.abs(startCol - endCol);
+      return rowDiff <= 1 && colDiff <= 1; // One square any direction
+    }
+
+    function resign(player) {
+      statusElement.textContent = `${player} has resigned. ${player === "White" ? "Black" : "White"} wins!`;
+      disableBoard();
+    }
+
+    function disableBoard() {
+      document.querySelectorAll(".square").forEach(square => square.removeEventListener("click", onSquareClick));
+    }
+
+    createBoard(); // Initial call to display the board
+  </script>
+</body>
+</html>
